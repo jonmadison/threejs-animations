@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Spheres</title>
+    <style>
+        body {
+            margin: 0;
+        }
+    </style>
+</head>
+
+<body>
+    <script src="node_modules/three/build/three.js"></script>
+    <script src="node_modules/@tweenjs/tween.js/dist/tween.umd.js"></script>
+
+    <script>
+        const FOCAL_LENGTH_START = 100;
+        const FOCAL_LENGTH_LIMIT = 0.3;
+        let hue = 0;
+        let fl = FOCAL_LENGTH_START;
+
+        function randomNumba(min, max) {
+            return (Math.random() * (max - min) + min).toFixed(4)
+        }
+
+        function sphere(radius, segments, color, position, wireframe) {
+            let geometry = new THREE.SphereGeometry(radius, segments, segments);
+
+            var myMaterial = {
+                    wireframe: wireframe ? wireframe : true,
+                    color: color
+                }
+                // We just have to build the material now
+            let material = new THREE.MeshStandardMaterial(myMaterial);
+            // Add some color to the materia
+
+            var s = new THREE.Mesh(geometry, material);
+            scene.add(s);
+            s.rotationSpeed = randomNumba(0.0005, 0.005)
+            s.material = material;
+            s.originColor = material.color;
+            console.log(`sphere set up originColor: ${s.originColor.r}  ${s.originColor.g}  ${s.originColor.b}`);
+            if (position) {
+                let pos = Object.values(position);
+                // console.log(`setting position to: ${pos}`);
+                s.position.set(pos[0], pos[1], pos[2]);
+            }
+
+            // let colorStart = {
+            //     r: material.color.r,
+            //     g: material.color.g,
+            //     b: material.color.b
+            // }
+
+            // let colorEnd = {
+            //     r: 256,
+            //     g: 256,
+            //     b: 256
+            // }
+
+            // let color_tween = new TWEEN.Tween(colorStart).to(colorEnd, 5000)
+            //     .yoyo(true)
+            //     .repeat(Infinity).start();
+
+            // color_tween.onUpdate(() => {
+            //     let colorString = `rgb(${Number.parseInt(colorStart.r)}, ${Number.parseInt(colorStart.g)}, ${Number.parseInt(colorStart.b)})`
+            //     const c = new THREE.Color(colorString);
+            //     console.log(JSON.stringify(colorString))
+            //     s.material.color.add(c);
+            // })
+
+            // s.tween = color_tween;
+
+            return s
+        }
+
+        var scene = new THREE.Scene();
+        var camera = new THREE.PerspectiveCamera(FOCAL_LENGTH_START, window.innerWidth / window.innerHeight, 0.1, 1000);
+
+        var renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        let shapes = [
+            [{
+                radius: 1,
+                triangles: 20,
+                color: 0x00ff00,
+                wireframe: false,
+                position: {
+                    x: 0,
+                    y: 0,
+                    z: 0
+                }
+            }, {
+                radius: 2,
+                triangles: 60,
+                color: 0xff2222,
+                position: {
+                    x: 0,
+                    y: 0,
+                    z: 0
+                }
+            }],
+            [{
+                radius: 3,
+                triangles: 40,
+                color: 0xb06dff,
+                position: {
+                    x: 0,
+                    y: 0,
+                    z: 0
+                }
+            }, {
+                radius: 4,
+                triangles: 30,
+                color: 0xff9fe7,
+                position: {
+                    x: 0,
+                    y: 0,
+                    z: 0
+                }
+            }],
+            [{
+                radius: 3,
+                triangles: 40,
+                color: 0xb06dff,
+                position: {
+                    x: 10,
+                    y: 10,
+                    z: 3
+                }
+            }, {
+                radius: 4,
+                triangles: 30,
+                color: 0xff9fe7,
+                position: {
+                    x: 10,
+                    y: 10,
+                    z: 3
+                }
+            }]
+        ]
+
+        let pairs = shapes.map(pair => {
+            return pair.map(def => {
+
+                let s = sphere(def.radius, def.triangles, def.color, def.position, def.wireframe)
+                    // console.log(`setting up sphere with rotationspeed: ${JSON.stringify(s.rotationSpeed)}`)
+                return s
+            })
+        });
+
+        var pointLight = new THREE.PointLight(0x99ff99);
+
+        // and set its position
+        pointLight.position.x = -100;
+        pointLight.position.y = 100;
+        pointLight.position.z = 400;
+
+        // Now, we can add it to the scene
+        scene.add(pointLight);
+
+        camera.position.z = 5;
+        let r1 = randomNumba(0.0005, 0.005);
+        let r2 = randomNumba(0.0005, 0.005);
+        let r = g = b = 0;
+
+        let fl_start = {
+            val: FOCAL_LENGTH_START
+        };
+        let fl_end = {
+            val: FOCAL_LENGTH_LIMIT
+        };
+
+        let fl_tween = new TWEEN.Tween(fl_start).to(fl_end, 7000)
+            .yoyo(true)
+            .easing(TWEEN.Easing.Exponential.InOut)
+            .repeat(Infinity).start();
+        //let col_tween = new TWEEN.Tween(c).to(c, 5000).repeat(Infinity).start();
+
+        fl_tween.onUpdate(function() {
+            // console.log(`update, fl_start val: ${fl_start.val}`)
+            camera.zoom = fl_start.val
+
+            // camera.setFocalLength(fl_start.val);
+        });
+
+        let position = {
+            x: -0.001,
+            y: -0.001,
+            z: -0.001
+        };
+        let target = {
+            x: 0.001,
+            y: 0.001,
+            z: 0.001
+        };
+
+        let pos_tween = new TWEEN.Tween(position).to(target, 10000)
+            .easing(TWEEN.Easing.Exponential.InOut)
+            .yoyo(true)
+            .repeat(Infinity).start();
+
+        pos_tween.onUpdate(function() {
+
+            // console.log(`pos_tween.onUpdate`)
+            let pos = Object.values(position)
+
+            pairs.forEach((pair, i) => {
+                pair.map(sphere => {
+                    // sphere.position.add(pos[0])
+                    let v = new THREE.Vector3(pos[0], pos[1], pos[2]);
+                    // console.log(`v: ${JSON.stringify(v)}`);
+                    // sphere.position.set(pos[0], pos[1], pos[2]);
+                    sphere.position.add(v);
+                })
+            })
+        });
+
+        let colorStart = {
+            h: 1,
+            s: 50,
+            l: 50
+        };
+
+        let colorEnd = {
+            h: 100,
+            s: 50,
+            l: 50
+        };
+
+
+        var animate = function() {
+            let r, g, b;
+
+            requestAnimationFrame(animate);
+            // fl = fl <= FOCAL_LENGTH_LIMIT ? FOCAL_LENGTH_START : fl -= 0.01;
+
+            pairs.forEach((pair, i) => {
+
+                // console.log(`rotating sphere set ${i}`);
+
+                pair.map(sphere => {
+                    console.log(`originColor: ${sphere.originColor.r}  ${sphere.originColor.g}  ${sphere.originColor.b}`);
+
+                    r = r < 1 ? sphere.originColor.r += 0.5 : sphere.originColor.r;
+                    g = g < 1 ? sphere.originColor.g += 0.5 : sphere.originColor.g;
+                    b = b < 1 ? sphere.originColor.b += 0.5 : sphere.originColor.b;
+
+                    // console.log(`sphere.material.color: ${sphere.material.color.toArray()}`);
+                    console.log(`setting rgb specifically to: ${r}, ${g}, ${b}`);
+                    sphere.material.color.setRGB(r, g, b);
+
+                    // sphere.material.color.setHSL(hue, 1, 1);
+                    sphere.rotation.x -= Number.parseFloat(r1);
+                    sphere.rotation.y += Number.parseFloat(r2);
+                    // sphere.tween.update();
+                })
+                fl_tween.update();
+                pos_tween.update();
+            })
+
+            renderer.render(scene, camera);
+        };
+
+        animate();
+    </script>
+</body>
+
+</html>

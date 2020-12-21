@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Spheres</title>
+    <style>
+        body {
+            margin: 0;
+        }
+    </style>
+</head>
+
+<body>
+    <script src="node_modules/three/build/three.js"></script>
+    <script src="node_modules/@tweenjs/tween.js/dist/tween.umd.js"></script>
+
+    <script>
+        const FOCAL_LENGTH_START = 40;
+        const FOCAL_LENGTH_LIMIT = 0.3;
+        let hue = 0;
+        let fl = FOCAL_LENGTH_START;
+
+        function randomNumba(min, max) {
+            return (Math.random() * (max - min) + min).toFixed(4)
+        }
+
+        function sphere(radius, segments, color) {
+            let geometry = new THREE.SphereGeometry(radius, segments, segments);
+
+            var myMaterial = {
+                wireframe: true,
+                color: color
+            }
+
+            // We just have to build the material now
+            let material = new THREE.MeshPhongMaterial(myMaterial);
+            // Add some color to the materia
+
+            var s = new THREE.Mesh(geometry, material);
+            scene.add(s);
+            s.rotationSpeed = randomNumba(0.0005, 0.005)
+            s.material = material;
+            s.originColor = material.color;
+            return s
+        }
+
+        var scene = new THREE.Scene();
+        var camera = new THREE.PerspectiveCamera(FOCAL_LENGTH_START, window.innerWidth / window.innerHeight, 0.1, 1000);
+
+        var renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        let shapes = [
+            [{
+                radius: 1,
+                triangles: 20,
+                color: 0x00ff00
+            }, {
+                radius: 2,
+                triangles: 60,
+                color: 0xff2222
+            }],
+            [{
+                radius: 3,
+                triangles: 40,
+                color: 0xb06dff
+            }, {
+                radius: 4,
+                triangles: 60,
+                color: 0xff9fe7
+            }],
+            [{
+                radius: 5,
+                triangles: 40,
+                color: 0x716fb4
+            }, {
+                radius: 6,
+                triangles: 60,
+                color: 0xedaf1a
+            }],
+            [{
+                radius: 7,
+                triangles: 40,
+                color: 0x716fb4
+            }, {
+                radius: 8,
+                triangles: 60,
+                color: 0x00ff00
+            }]
+        ]
+
+        let pairs = shapes.map(pair => {
+            return pair.map(def => {
+
+                let s = sphere(def.radius, def.triangles, def.color)
+                console.log(`setting up sphere with rotationspeed: ${JSON.stringify(s.rotationSpeed)}`)
+                return s
+            })
+        });
+
+        var pointLight = new THREE.PointLight(0x99ff99);
+
+        // and set its position
+        pointLight.position.x = -100;
+        pointLight.position.y = 100;
+        pointLight.position.z = 400;
+
+        // Now, we can add it to the scene
+        scene.add(pointLight);
+
+        camera.position.z = 5;
+        let r1 = randomNumba(0.0005, 0.005);
+        let r2 = randomNumba(0.0005, 0.005);
+        let r = g = b = 0;
+
+        let fl_start = {
+            val: FOCAL_LENGTH_START
+        };
+        let fl_end = {
+            val: FOCAL_LENGTH_LIMIT
+        };
+
+        let fl_tween = new TWEEN.Tween(fl_start).to(fl_end, 7000)
+            .yoyo(true)
+            .easing(TWEEN.Easing.Exponential.InOut)
+            .repeat(Infinity).start();
+        //let col_tween = new TWEEN.Tween(c).to(c, 5000).repeat(Infinity).start();
+
+        fl_tween.onUpdate(function() {
+            // console.log(`update, fl_start val: ${fl_start.val}`)
+            camera.setFocalLength(fl_start.val);
+        });
+
+        var animate = function() {
+            requestAnimationFrame(animate);
+            // fl = fl <= FOCAL_LENGTH_LIMIT ? FOCAL_LENGTH_START : fl -= 0.01;
+
+
+            pairs.forEach((pair, i) => {
+
+                // console.log(`rotating sphere set ${i}`);
+
+                pair.map(sphere => {
+                    let col = new THREE.Color(`hsl(${hue}, 100%, 50%)`);
+                    let originColor = sphere.originColor.toArray();
+                    r = r < 0.8 ? originColor[0] += 0.002 : originColor[0];
+                    g = g < 0.8 ? originColor[1] += 0.002 : originColor[1];
+                    b = b < 0.8 ? originColor[2] += 0.002 : originColor[2];
+
+                    // console.log(`sphere.material.color: ${sphere.material.color.toArray()}`);
+                    sphere.material.color.setRGB(r, g, b);
+
+                    // sphere.material.color.setHSL(hue, 1, 1);
+                    sphere.rotation.x -= Number.parseFloat(r1);
+                    sphere.rotation.y += Number.parseFloat(r2);
+                })
+                fl_tween.update();
+
+            })
+
+            renderer.render(scene, camera);
+        };
+
+        animate();
+    </script>
+</body>
+
+</html>
