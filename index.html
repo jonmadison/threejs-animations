@@ -1,170 +1,218 @@
 <!DOCTYPE html>
 <html>
-
-<head>
-    <meta charset="utf-8">
+  <head>
+    <meta charset="utf-8" />
     <title>Spheres</title>
     <style>
-        body {
-            margin: 0;
-        }
+      body {
+        margin: 0;
+      }
     </style>
-</head>
+  </head>
 
-<body>
+  <body>
     <script src="node_modules/three/build/three.js"></script>
     <script src="node_modules/@tweenjs/tween.js/dist/tween.umd.js"></script>
+    <script src="node_modules/webmidi/webmidi.min.js"></script>
+    <script src="node_modules/tone/build/Tone.js"></script>
 
     <script>
-        const FOCAL_LENGTH_START = 40;
-        const FOCAL_LENGTH_LIMIT = 0.3;
-        let hue = 0;
-        let fl = FOCAL_LENGTH_START;
+      let synth;
+      let loaded = 0;
+      let currentNote = 0;
+      let factor = 1;
+      let knob;
+      let cameraZoom = 1;
+      let knobValues = [68, 1, 1, 1];
+      const MIDI_INPUT = "V49 Out";
+      const keys = {
+        pitchbend: 1,
+        keys: [28, 29, 30, 31],
+      };
+      const FL_SCALE = 1 / 100;
+      const FOCAL_LENGTH_START = 40;
+      const FOCAL_LENGTH_LIMIT = 0.3;
 
-        function randomNumba(min, max) {
-            return (Math.random() * (max - min) + min).toFixed(4)
-        }
+      function setupMidiAndSynth() {
+        WebMidi.enable(function (err) {
+          let input = WebMidi.getInputByName(MIDI_INPUT);
+          if (!input) return;
+          synth = new Tone.PolySynth(Tone.Synth).toDestination();
 
-        function sphere(radius, segments, color) {
-            let geometry = new THREE.SphereGeometry(radius, segments, segments);
+          input.addListener("noteon", "all", function (e) {
+            currentNote = e.note.number;
+            factor = e.note.number / 5;
+            console.log(e.note.number);
+            console.log(
+              "Received 'noteon' message (" + e.note.name + e.note.octave + ")."
+            );
 
-            var myMaterial = {
-                wireframe: true,
-                color: color
+            synth.triggerAttackRelease(e.note.name + e.note.octave, "16n");
+          });
+
+          input.addListener("pitchbend", "all", function (e) {
+            cameraZoom = e.value * 10;
+            console.log(`cameraZoom: ${cameraZoom}`);
+          });
+
+          input.addListener("midimessage", "all", function (e) {
+            // console.log("midimessage target: " + JSON.stringify(e.target));
+            // console.log("midimessage data: " + e.data);
+            if (e.data[0] === 176 && e.data[1] !== keys.pitchbend) {
+              const KNOB_START = 20;
+              let [knob, value] = [e.data[1] - KNOB_START, e.data[2]];
+              knobValues[knob] = Math.log(value);
+
+              console.log(
+                `knob ${knob} = ${value}, colors[${knob}] = ${knobValues[knob]}`
+              );
             }
+          });
+        });
+      }
 
-            // We just have to build the material now
-            let material = new THREE.MeshPhongMaterial(myMaterial);
-            // Add some color to the materia
+      function randomNumba(min, max) {
+        return (Math.random() * (max - min) + min).toFixed(4);
+      }
 
-            var s = new THREE.Mesh(geometry, material);
-            scene.add(s);
-            s.rotationSpeed = randomNumba(0.0005, 0.005)
-            s.material = material;
-            s.originColor = material.color;
-            return s
+      function sphere(radius, segments, color) {
+        const phiStart = 0;
+        const phiLength = Math.PI * 2;
+        const thetaStart = Math.PI * 0.0;
+        const thetaLength = Math.PI * 2;
+
+        let geometry = new THREE.SphereGeometry(
+          radius,
+          segments,
+          segments,
+          phiStart,
+          phiLength,
+          thetaStart,
+          thetaLength
+        );
+
+        var myMaterial = {
+          wireframe: true,
+          color: color,
+        };
+
+        // We just have to build the material now
+        let material = new THREE.MeshPhongMaterial(myMaterial);
+        // Add some color to the materia
+
+        var s = new THREE.Mesh(geometry, material);
+        s.rotationSpeed = randomNumba(0.05, 0.1);
+        s.material = material;
+        s.originColor = material.color;
+
+        scene.add(s);
+        return s;
+      }
+
+      let scene = new THREE.Scene();
+      let camera = new THREE.PerspectiveCamera(
+        FOCAL_LENGTH_START,
+        window.innerWidth / window.innerHeight,
+        1,
+        10000
+      );
+
+      let renderer = new THREE.WebGLRenderer();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      document.body.appendChild(renderer.domElement);
+
+      let shapes = [1, 2, 3, 4].map((n) => {
+        let name = n * 2;
+
+        return [
+          {
+            name: `sphere-${name}`,
+            radius: n,
+            triangles: n * 10,
+            color: 0xffffff,
+          },
+          {
+            name: `sphere-${name}`,
+            radius: n + 2,
+            triangles: n * 10,
+            color: 0xffffff,
+          },
+        ];
+      });
+
+      let pairs = shapes.map((pair) => {
+        return pair.map((def) => {
+          let s = sphere(def.radius, def.triangles, def.color);
+          // console.log(`setting up sphere ${s.uuid}`);
+          return s;
+        });
+      });
+
+      var pointLight = new THREE.PointLight(0x99ff99);
+
+      // and set its position
+      pointLight.position.x = -100;
+      pointLight.position.y = 100;
+      pointLight.position.z = 400;
+
+      // Now, we can add it to the scene
+      scene.add(pointLight);
+
+      camera.position.z = 1;
+      let r = (g = b = 0);
+
+      let animateSphere = function (sphere) {
+        let r1 = randomNumba(-0.0005, 0.005);
+        let r2 = randomNumba(0.0005, 0.005);
+        function setupAnimation() {
+          // camera.setFocalLength(lastFL);
+          // let col = new THREE.Color(`hsl(${hue}, 100%, 58%)`);
         }
 
-        var scene = new THREE.Scene();
-        var camera = new THREE.PerspectiveCamera(FOCAL_LENGTH_START, window.innerWidth / window.innerHeight, 0.1, 1000);
+        function handleControls() {
+          r = knobValues[0];
+          g = knobValues[1];
+          b = knobValues[2];
 
-        var renderer = new THREE.WebGLRenderer();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        document.body.appendChild(renderer.domElement);
+          // console.log(`sphere.material.color: ${sphere.material.color.toArray()}`);
+          sphere.material.color.setRGB(r, g, b);
+        }
 
-        let shapes = [
-            [{
-                radius: 1,
-                triangles: 20,
-                color: 0x00ff00
-            }, {
-                radius: 2,
-                triangles: 60,
-                color: 0xff2222
-            }],
-            [{
-                radius: 3,
-                triangles: 40,
-                color: 0xb06dff
-            }, {
-                radius: 4,
-                triangles: 60,
-                color: 0xff9fe7
-            }],
-            [{
-                radius: 5,
-                triangles: 40,
-                color: 0x716fb4
-            }, {
-                radius: 6,
-                triangles: 60,
-                color: 0xedaf1a
-            }],
-            [{
-                radius: 7,
-                triangles: 40,
-                color: 0x716fb4
-            }, {
-                radius: 8,
-                triangles: 60,
-                color: 0x00ff00
-            }]
-        ]
+        function doAnimation() {
+          sphere.rotation.x = sphere.rotation.x -= Number.parseFloat(r1);
+          sphere.rotation.y += Number.parseFloat(r2);
+          renderer.render(scene, camera);
+          sphere.rotation.z =
+            Math.abs(knobValues[3]) === Infinity ? 0 : knobValues[3];
+          camera.position.z = cameraZoom + 10;
+          lastFL =
+            camera.getFocalLength() === Infinity ? 2 : camera.getFocalLength();
+          // camera.setFocalLength(lastFL + currentNote * FL_SCALE);
+          console.log(currentNote * FL_SCALE);
+          sphere.phiLength = Math.PI * 2;
+          handleControls();
+          requestAnimationFrame(doAnimation);
+        }
+        setupAnimation();
+        doAnimation();
+      };
 
-        let pairs = shapes.map(pair => {
-            return pair.map(def => {
-
-                let s = sphere(def.radius, def.triangles, def.color)
-                console.log(`setting up sphere with rotationspeed: ${JSON.stringify(s.rotationSpeed)}`)
-                return s
-            })
-        });
-
-        var pointLight = new THREE.PointLight(0x99ff99);
-
-        // and set its position
-        pointLight.position.x = -100;
-        pointLight.position.y = 100;
-        pointLight.position.z = 400;
-
-        // Now, we can add it to the scene
-        scene.add(pointLight);
-
-        camera.position.z = 5;
-        let r1 = randomNumba(0.0005, 0.005);
-        let r2 = randomNumba(0.0005, 0.005);
-        let r = g = b = 0;
-
-        let fl_start = {
-            val: FOCAL_LENGTH_START
-        };
-        let fl_end = {
-            val: FOCAL_LENGTH_LIMIT
-        };
-
-        let fl_tween = new TWEEN.Tween(fl_start).to(fl_end, 7000)
-            .yoyo(true)
-            .easing(TWEEN.Easing.Exponential.InOut)
-            .repeat(Infinity).start();
-        //let col_tween = new TWEEN.Tween(c).to(c, 5000).repeat(Infinity).start();
-
-        fl_tween.onUpdate(function() {
-            // console.log(`update, fl_start val: ${fl_start.val}`)
-            camera.setFocalLength(fl_start.val);
-        });
-
-        var animate = function() {
-            requestAnimationFrame(animate);
-            // fl = fl <= FOCAL_LENGTH_LIMIT ? FOCAL_LENGTH_START : fl -= 0.01;
-
-
-            pairs.forEach((pair, i) => {
-
-                // console.log(`rotating sphere set ${i}`);
-
-                pair.map(sphere => {
-                    let col = new THREE.Color(`hsl(${hue}, 100%, 50%)`);
-                    let originColor = sphere.originColor.toArray();
-                    r = r < 0.8 ? originColor[0] += 0.002 : originColor[0];
-                    g = g < 0.8 ? originColor[1] += 0.002 : originColor[1];
-                    b = b < 0.8 ? originColor[2] += 0.002 : originColor[2];
-
-                    // console.log(`sphere.material.color: ${sphere.material.color.toArray()}`);
-                    sphere.material.color.setRGB(r, g, b);
-
-                    // sphere.material.color.setHSL(hue, 1, 1);
-                    sphere.rotation.x -= Number.parseFloat(r1);
-                    sphere.rotation.y += Number.parseFloat(r2);
-                })
-                fl_tween.update();
-
-            })
-
-            renderer.render(scene, camera);
-        };
-
-        animate();
+      pairs.flat().forEach((sphere, i) => {
+        // console.log(`loop sphere ${JSON.stringify(sphere.uuid)}`);
+        animateSphere(sphere);
+      });
     </script>
-</body>
-
+  </body>
 </html>
+<script>
+  setupMidiAndSynth();
+Yeah 
+  document.addEventListener("click", () => {
+    if (!loaded) {
+      alert("To begin, I'll need a note'");
+      Tone.start();
+
+      loaded = 1;
+    }
+  });
+</script>
